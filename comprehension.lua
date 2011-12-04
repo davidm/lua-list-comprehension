@@ -1,14 +1,156 @@
--- comprehension.lua
--- List comprehensions implemented in Lua.
---
--- http://lua-users.org/wiki/ListComprehensions
---
--- Example:
---   local comp = require 'comprehension' . new()
---   assert(comp 'sum(x^2 for x)' {2,3,4} == 2^2+3^2+4^2)
---
--- (c) 2008 David Manura. Licensed under the same terms as Lua (MIT license).
---
+--[[
+ comprehension.lua
+ List comprehensions implemented in Lua.
+
+ http://lua-users.org/wiki/ListComprehensions
+
+SYNOPSIS
+ 
+  local comp = require 'comprehension' . new()
+  comp 'x^2 for x' {2,3} --> {2^2,3^2}
+  comp 'x^2 for _,x in ipairs(_1)' {2,3} --> {2^2,3^2}
+  comp 'x^2 for x=_1,_2' (2,3) --> {2^2,3^2}
+
+  comp 'sum(x^2 for x)' {2,3} --> 2^2+3^2
+  comp 'max(x*y for x for y if x<4 if y<6)' ({2,3,4}, {4,5,6}) --> 3*5
+  comp 'table(v,k for k,v in pairs(_1))' {[3]=5, [5]=7} --> {[5]=3, [7]=5}
+ 
+DESCRIPTION
+
+  List comprehensions [1] provide concise syntax for building lists in
+  mathematical set-builder notation. A number of programming languages
+  (e.g. Haskell and Python) provide built-in support for list comprehensions.
+  Lua does not; however, there are are ways to implement it in Lua.
+
+  Unlike some other approaches, the following approach implements list
+  comprehensions in pure Lua as a library (without patching or token filters).
+  It uses a technique with dynamic code generation (`loadstring`) and caching
+  somewhat analogous to ShortAnonymousFunctions.
+
+  This library has been incorporated into [Penlight].
+  
+  ## Run-time behavior
+
+  To illustrate the run-time characteristics, consider the following code:
+
+    comp 'sum(x^2 for x if x % 2 == 0)'
+    That gets code generated to this Lua function:
+
+    local __in1 = ...
+    local __result = (  0  )
+    for __idx1 = 1, #__in1 do
+      local x = __in1[__idx1]
+      if x % 2 == 0 then
+        __result = __result + ( __x^2 )
+      end
+    end
+    return __result
+
+  Note that no intermediate lists are built. The code efficiently avoids
+  memory allocations (apart from the allocation of the function itself,
+  but that is done only on the first invocation due to caching/memoization).
+  Also, no global variables are referenced.
+
+
+DEPENDENCIES
+
+  None (other than Lua 5.1 or 5.2).
+  
+HOME PAGE
+
+  http://lua-users.org/wiki/ListComprehensions
+  https://github.com/davidm/lua-list-comprehension
+
+DOWNLOAD/INSTALL
+
+  If using LuaRocks:
+    luarocks install lua-list-comprehension
+
+  Otherwise, download <https://github.com/davidm/lua-list-comprehension/zipball/master>.
+  Alternately, if using git:
+    git clone git://github.com/davidm/lua-list-comprehension.git
+    cd lua-list-comprehension
+  Optionally unpack and install in LuaRocks:
+    ./util.mk
+    cd tmp/* && luarocks make
+  
+POSSIBLE EXTENSIONS
+
+  A simple extension would be to provide a more mathematical (or more
+  Haskell-like) syntax:
+
+    assert(comp 'sum { x^2 | x <- ?, x % 2 == 0 }' {2,3,4} == 2^2+4^2)
+    A compelling extension, as recommended by Greg Fitzgerald, is to implement
+    the generalized list comprehensions proposed by SPJ and Wadler [2].
+    This provides some clear directions to take this to the next level, and
+    the related work in Microsoft LINQ [3] shows what this could look like
+    in practice.
+
+  The "zip" extension to list comprehensions, using the Haskell-like notation in the paper
+
+    [ (x,y,z,w) | (x <- xs | y <- ys), (z <- zs | w <- ws) ] ,
+    would require only small changes. The corresponding Lua function to generate that would be like this:
+
+    local __xs, __ys, __zs, __ws = ...
+    local __ret = {}   -- i.e. $list_init
+    for __i=1,__math_min(#__xs, #__ys) do
+      local x, y = __xs[__i], __ys[__i]
+      for __j=1,__math_min(#__zs, #__ws) do
+        local z, w = __zs[__j], __ws[__j]
+        __ret[#__ret+1] = {x,y,z,w}   -- i.e. $list_accum(__ret, x, y, z, w)
+      end
+    end
+    return ret
+    (The "$" notation here is a short-hand for compile-time macros that were used to expand the source.)
+
+  Supporting sort or grouped by, e.g. again using notation in the paper
+
+    [ the x.name, sum x.deposit | x <- transactions, group by x.name ] ,
+    could be achieved by generating functions like this:
+
+    local __transactions = ...
+    local __groups1 = {}
+    local __groups2 = {}
+    for __i = 1, #__transactions do
+      local x = __transactions[__i]
+      local __key = ( x.name )  -- i.e. $group_by_key
+      __groups1[__key] = ( x.name )
+             -- i.e. $accum_the(__groups1[__key], $val1)
+      __groups2[__key] = (__groups2[__key] or 0) + ( x.deposit )
+             -- i.e. $accum_sum(__groups2[__key], $val2)
+    end
+    local __result = {}   -- i.e. $list_init
+    for __key in __pairs(__groups1) do
+      __result[__result+1] = {__groups1[__key], __groups2[__key]}
+             -- i.e. $accum_list(__result, __v)
+    end
+    return __result
+    Taking this to its full fruition seems quite achievable (after some
+    research), though it would be a significant extension to this module
+    (any takers?).
+  
+STATUS
+
+  This module is new and likely still has some bugs.
+
+RELATED WORK
+
+  - LuaMacros http://lua-users.org/wiki/LuaMacros
+    http://lua-users.org/lists/lua-l/2007-12/msg00014.html
+  - MetaLua http://lua-users.org/wiki/MetaLua
+    http://metalua.luaforge.net/metalua-manual.html#htoc52
+    http://metalua.luaforge.net/src/lib/ext-syntax/clist.lua.html
+
+REFERENCES
+
+  [1] http://en.wikipedia.org/wiki/List_comprehension
+  [2] http://research.microsoft.com/~simonpj/papers/list-comp/
+  [3] http://en.wikipedia.org/wiki/Language_Integrated_Query
+      
+ (c) 2008-2011 David Manura. Licensed under the same terms as Lua (MIT license).
+--]]
+
+local comprehension = {_TYPE='module', _NAME='comprehension', _VERSION='0.1.20111203'}
 
 local assert = assert
 local loadstring = loadstring
@@ -262,7 +404,6 @@ local function new(env)
 end
 
 
-local comprehension = {}
 comprehension.new = new
 
 

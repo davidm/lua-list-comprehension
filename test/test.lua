@@ -1,3 +1,5 @@
+#!/usr/bin/env lua
+
 -- comprehension_test.lua
 -- test of comprehension.lua
 

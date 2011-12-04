@@ -1,0 +1,35 @@
+package = "lua-list-comprehension"
+version = "$(_VERSION)"
+source = {
+   url = "git://github.com/davidm/lua-list-comprehension.git",
+   tag='v$(_VERSION)'
+}
+description = {
+   summary    = "List comprehensions implemented via Lua code generation.",
+   detailed   = [[
+     List comprehensions provide concise syntax for building lists in
+     mathematical set-builder notation.
+     This module implements list comprehensions in pure Lua as a
+     library (without patching or token filters). It uses a technique with
+     dynamic code generation (loadstring) and caching
+   ]],
+   license    =  "MIT/X11",
+   homepage   = "http://lua-users.org/wiki/ListComprehensions",
+       -- https://github.com/davidm/lua-list-comprehension
+   maintainer = "David Manura <http://lua-users.org/wiki/DavidManura>",
+}
+dependencies = {
+   "lua >= 5.1",  -- including 5.2
+   "lua-balanced >= 0.1"
+}
+build = {
+   type = "none",
+   install = {
+      lua = {
+         ["comprehension"] = "comprehension.lua",
+      }
+   },
+   copy_directories = {"test"},
+}
+-- test: tests/test.lua
+-- _VERSION from comprehension.lua

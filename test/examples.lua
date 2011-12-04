@@ -1,3 +1,5 @@
+#!/usr/bin/env lua
+
 local comp = require 'comprehension' . new()
 comp 'x^2 for x' {2,3} --> {2^2,3^2}
 comp 'x^2 for _,x in ipairs(_1)' {2,3} --> {2^2,3^2}

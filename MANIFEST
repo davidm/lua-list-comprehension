@@ -1,0 +1,6 @@
+README.txt
+comprehension.lua
+util.mk
+test/examples.lua
+test/test.lua
+rockspec.in
